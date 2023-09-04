@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.gradle.api.artifacts.ModuleVersionIdentifier;
 import org.gradle.api.artifacts.component.ComponentArtifactIdentifier;
@@ -163,9 +164,9 @@ public class SpdxDocumentBuilder {
         System.out.println(
             "DisplayName: "
             + e.getKey().getDisplayName()
-            + "ComponentIdentifier: "
+            + ", ComponentIdentifier: "
             + e.getKey().getComponentIdentifier()
-            + "Path: " + e.getValue()));
+            + ", Path: " + e.getValue()));
 
     // Filter resolved artifacts so there is none with same component identifier.
     Map<ComponentArtifactIdentifier, File> resolvedArtifactsFiltered = new HashMap<>();
@@ -174,6 +175,13 @@ public class SpdxDocumentBuilder {
       if (!seenComponentIdentifiers.contains(k.getComponentIdentifier())) {
         resolvedArtifactsFiltered.put(k, v);
         seenComponentIdentifiers.add(k.getComponentIdentifier());
+      } else {
+        System.out.println(
+            "Filtering out: DisplayName: "
+                + k.getDisplayName()
+                + ", ComponentIdentifier: "
+                + k.getComponentIdentifier()
+                + ", Path: " + v);
       }
     });
     resolvedArtifacts = resolvedArtifactsFiltered;
