@@ -158,6 +158,26 @@ public class SpdxDocumentBuilder {
         allProjects.stream().collect(Collectors.toMap(ProjectInfo::getPath, Function.identity()));
     this.describesProject = knownProjects.get(projectPath);
 
+    // Debug content of resolved artifacts.
+    resolvedArtifacts.entrySet().forEach(e ->
+        System.out.println(
+            "DisplayName: "
+            + e.getKey().getDisplayName()
+            + "ComponentIdentifier: "
+            + e.getKey().getComponentIdentifier()
+            + "Path: " + e.getValue()));
+
+    // Filter resolved artifacts so there is none with same component identifier.
+    Map<ComponentArtifactIdentifier, File> resolvedArtifactsFiltered = new HashMap<>();
+    Set<ComponentIdentifier> seenComponentIdentifiers = new HashSet<>();
+    resolvedArtifacts.forEach((k, v) -> {
+      if (!seenComponentIdentifiers.contains(k.getComponentIdentifier())) {
+        resolvedArtifactsFiltered.put(k, v);
+        seenComponentIdentifiers.add(k.getComponentIdentifier());
+      }
+    });
+    resolvedArtifacts = resolvedArtifactsFiltered;
+
     this.resolvedArtifacts =
         resolvedArtifacts.entrySet().stream()
             .collect(Collectors.toMap(e -> e.getKey().getComponentIdentifier(), Entry::getValue));
