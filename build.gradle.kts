@@ -1,7 +1,7 @@
 plugins {
     id("com.gradle.plugin-publish") version "1.2.0"
     id("com.diffplug.spotless") version "6.16.0"
-    signing
+//    signing
 //    id("org.spdx.sbom") version "0.1.0"
 }
 
@@ -97,11 +97,11 @@ tasks.withType<AbstractArchiveTask>().configureEach {
     isReproducibleFileOrder = true
 }
 
-signing {
-    val signingKey: String? by project
-    val signingPassword: String? by project
-    useInMemoryPgpKeys(signingKey, signingPassword)
-}
+//signing {
+//    val signingKey: String? by project
+//    val signingPassword: String? by project
+//    useInMemoryPgpKeys(signingKey, signingPassword)
+//}
 
 // spdxSbom {
 //     targets {

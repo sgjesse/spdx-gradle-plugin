@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.gradle.api.artifacts.ModuleVersionIdentifier;
 import org.gradle.api.artifacts.component.ComponentArtifactIdentifier;
@@ -157,6 +158,37 @@ public class SpdxDocumentBuilder {
     this.knownProjects =
         allProjects.stream().collect(Collectors.toMap(ProjectInfo::getPath, Function.identity()));
     this.describesProject = knownProjects.get(projectPath);
+
+    // Debug content of resolved artifacts.
+    /*
+    resolvedArtifacts.entrySet().forEach(e ->
+        System.out.println(
+            "DisplayName: "
+            + e.getKey().getDisplayName()
+            + ", ComponentIdentifier: "
+            + e.getKey().getComponentIdentifier()
+            + ", Path: " + e.getValue()));
+    */
+
+    // Filter resolved artifacts so there is none with same component identifier.
+    Map<ComponentArtifactIdentifier, File> resolvedArtifactsFiltered = new HashMap<>();
+    Set<ComponentIdentifier> seenComponentIdentifiers = new HashSet<>();
+    resolvedArtifacts.forEach((k, v) -> {
+      if (!seenComponentIdentifiers.contains(k.getComponentIdentifier())) {
+        resolvedArtifactsFiltered.put(k, v);
+        seenComponentIdentifiers.add(k.getComponentIdentifier());
+      } else {
+        /*
+        System.out.println(
+            "Filtering out: DisplayName: "
+                + k.getDisplayName()
+                + ", ComponentIdentifier: "
+                + k.getComponentIdentifier()
+                + ", Path: " + v);
+        */
+      }
+    });
+    resolvedArtifacts = resolvedArtifactsFiltered;
 
     this.resolvedArtifacts =
         resolvedArtifacts.entrySet().stream()
@@ -329,7 +361,7 @@ public class SpdxDocumentBuilder {
       // Gradle 8.2 has an issue that causes sourceRepo to be a generated id instead of the name
       // Gradle 8.2.1 resolved that issue
       var repoUri = mavenArtifactRepositories.get(sourceRepo);
-      if (taskExtension != null && repoUri != null) {
+      if (taskExtension != null) {
         repoUri = taskExtension.mapRepoUri(repoUri, moduleId);
       }
       if (repoUri == null) {
