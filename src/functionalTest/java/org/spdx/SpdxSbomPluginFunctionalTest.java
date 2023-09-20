@@ -42,7 +42,11 @@ class SpdxSbomPluginFunctionalTest {
   }
 
   private File getKotlinBuildFile() {
-    return new File(projectDir, "build.gradle.kts");
+    return getKotlinBuildFile(projectDir);
+  }
+
+  private File getKotlinBuildFile(File dir) {
+    return new File(dir, "build.gradle.kts");
   }
 
   private File getSettingsFile() {
@@ -50,7 +54,11 @@ class SpdxSbomPluginFunctionalTest {
   }
 
   private File getKotlinSettingsFile() {
-    return new File(projectDir, "settings.gradle.kts");
+    return getKotlinSettingsFile(projectDir);
+  }
+
+  private File getKotlinSettingsFile(File dir) {
+    return new File(dir, "settings.gradle.kts");
   }
 
   @Test
@@ -300,6 +308,103 @@ class SpdxSbomPluginFunctionalTest {
             line ->
                 MatcherAssert.assertThat(
                     line, Matchers.containsString("https://git.duck.com@asdf")));
+  }
+
+  @Test
+  public void canUseBuildExtensionWithLocalMavenRepository() throws IOException, SpdxVerificationException {
+    File dir = new File(new File(projectDir, "sub"), "subsub");
+    Files.createDirectories(dir.toPath());
+    writeString(getKotlinSettingsFile(dir), "rootProject.name = \"spdx-functional-test-project\"");
+    writeString(
+        getKotlinBuildFile(dir),
+        "import java.net.URI\n"
+            + "import org.spdx.sbom.gradle.project.ProjectInfo\n"
+            + "plugins {\n"
+            + "  id(\"org.spdx.sbom\")\n"
+            + "  `java`\n"
+            + "}\n"
+            + "tasks.withType<org.spdx.sbom.gradle.SpdxSbomTask> {\n"
+            + "    taskExtension.set(object : org.spdx.sbom.gradle.extensions.DefaultSpdxSbomTaskExtension() {\n"
+            + "        override fun mapRepoUri(input: URI?, moduleId: ModuleVersionIdentifier): URI {\n"
+            + "            return URI.create(\"https://duck.com\")\n"
+            + "        }\n"
+            + "    })\n"
+            + "}\n"
+            + "version = \"1\"\n"
+            + "repositories {\n"
+            + "  maven {\n"
+            + "    url = uri(\"file:../../repo\")\n"
+            + "  }\n"
+            + "}\n"
+            + "dependencies {\n"
+            + "  implementation(\"com.example:a:1\")\n"
+            + "}\n"
+            + "spdxSbom {\n"
+            + "  targets {\n"
+            + "    create(\"sbom\") {\n"
+            + "    }\n"
+            + "  }\n"
+            + "}\n");
+
+    Path a1 = projectDir.toPath().resolve(Paths.get("repo", "com", "example", "a", "1"));
+    Files.createDirectories(a1);
+    Path pom = a1.resolve("a-1.pom");
+    writeString(
+        pom.toFile(),
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
+            + "    xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd\">\n"
+            + "  <modelVersion>4.0.0</modelVersion>\n"
+            + "  <groupId>com.example</groupId>\n"
+            + "  <artifactId>a</artifactId>\n"
+            + "  <version>1</version>\n"
+            + "  <packaging>jar</packaging>\n"
+            + "  <name>A library</name>\n"
+            + "  <description>\n"
+            + "    ignore me\n"
+            +   "</description>\n"
+            + "</project>\n");
+    Path jar = a1.resolve("a-1.jar");
+    writeString(jar.toFile(), "");
+    Path originJson = a1.resolve("origin.json");
+    writeString(originJson.toFile(),
+        "{\n"
+            + "  \"artifacts\": [\n"
+            + "    {\n"
+            + "      \"file\": \"com/example/a/1/a-1.pom\",\n"
+            + "      \"repo\": \"https://truck.com/\",\n"
+            + "      \"artifact\": \"com.example:a:pom:1\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"file\": \"com/example/a/1/a-1..jar\",\n"
+            + "      \"repo\": \"https://truck.com/\",\n"
+            + "      \"artifact\": \"com.example:a:jar:1\"\n"
+            + "    }\n"
+            + "  ]\n"
+            + "}");
+    GradleRunner runner = GradleRunner.create();
+    runner.forwardOutput();
+    runner.withPluginClasspath();
+    runner.withDebug(true);
+    runner.withArguments("spdxSbom", "--stacktrace");
+    runner.withProjectDir(dir);
+    runner.build();
+
+    Path outputFile = dir.toPath().resolve(Paths.get("build/spdx/sbom.spdx.json"));
+    Verify.verify(outputFile.toFile().getAbsolutePath(), SerFileType.JSON);
+
+    // Verify the result
+    assertTrue(Files.isRegularFile(outputFile));
+    var sbom = Files.readAllLines(outputFile);
+    MatcherAssert.assertThat(sbom.stream()
+        .filter(line -> line.contains("downloadLocation"))
+        .filter(line -> !line.contains("NOASSERTION")).count(), Matchers.is(1L));
+
+    sbom.stream()
+        .filter(line -> line.contains("downloadLocation"))
+        .filter(line -> !line.contains("NOASSERTION"))
+        .forEach(
+            line -> MatcherAssert.assertThat(line, Matchers.containsString("https://duck.com/com/example/a/1/a-1.jar")));
   }
 
   @Test
